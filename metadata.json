@@ -1,0 +1,7 @@
+{
+  "name": "Bizness Roots ERP - Stock & Serial Tracker",
+  "description": "Business inventory and distribution ERP with serial code tracking, stock in/out management, user role permissions, and PDF/Excel export.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
