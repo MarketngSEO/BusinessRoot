@@ -24,6 +24,45 @@ export function numberToWords(num: number): string {
   return inWords(integerPart);
 }
 
+/**
+ * Automatically generates a guaranteed unique, sequential tax invoice number.
+ * e.g. SINV-2026-0109, SINV-2026-0110...
+ * User cannot alter this, guaranteeing strictly audited serial uniqueness.
+ */
+export function generateNextUniqueInvoiceNumber(sales: SaleTransaction[] = []): string {
+  const currentYear = new Date().getFullYear();
+  const prefix = `SINV-${currentYear}-`;
+  let maxSeq = 100;
+
+  for (const s of sales) {
+    if (s.invoiceNumber && s.invoiceNumber.startsWith(prefix)) {
+      const numPart = s.invoiceNumber.replace(prefix, '');
+      const parsed = parseInt(numPart, 10);
+      if (!isNaN(parsed) && parsed > maxSeq) {
+        maxSeq = parsed;
+      }
+    } else if (s.invoiceNumber && s.invoiceNumber.includes('-')) {
+      const parts = s.invoiceNumber.split('-');
+      const lastPart = parts[parts.length - 1];
+      const parsed = parseInt(lastPart, 10);
+      if (!isNaN(parsed) && parsed > maxSeq && parsed < 100000) {
+        maxSeq = Math.max(maxSeq, parsed);
+      }
+    }
+  }
+
+  let nextSeq = maxSeq + 1;
+  let candidate = `${prefix}${String(nextSeq).padStart(4, '0')}`;
+  const existingNumbers = new Set(sales.map(s => s.invoiceNumber));
+
+  while (existingNumbers.has(candidate)) {
+    nextSeq++;
+    candidate = `${prefix}${String(nextSeq).padStart(4, '0')}`;
+  }
+
+  return candidate;
+}
+
 export function exportStockToExcel(
   products: Product[],
   serials: SerialItem[],

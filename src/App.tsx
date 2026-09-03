@@ -252,6 +252,7 @@ export default function App() {
             <SalesView
               products={database.products}
               serials={database.serials}
+              purchases={database.purchases}
               company={database.company}
               currentUser={currentUser}
               sales={database.sales}
