@@ -1,7 +1,28 @@
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Product, SerialItem, CompanyConfig } from '../types/inventory';
+import { Product, SerialItem, CompanyConfig, SaleTransaction } from '../types/inventory';
+
+export function numberToWords(num: number): string {
+  if (num === 0) return 'Zero';
+  const a = [
+    '', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
+    'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'
+  ];
+  const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+  function inWords(n: number): string {
+    if (n < 20) return a[n];
+    if (n < 100) return b[Math.floor(n / 10)] + (n % 10 !== 0 ? ' ' + a[n % 10] : '');
+    if (n < 1000) return a[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' and ' + inWords(n % 100) : '');
+    if (n < 100000) return inWords(Math.floor(n / 1000)) + ' Thousand' + (n % 1000 !== 0 ? ' ' + inWords(n % 1000) : '');
+    if (n < 10000000) return inWords(Math.floor(n / 100000)) + ' Lakh' + (n % 100000 !== 0 ? ' ' + inWords(n % 100000) : '');
+    return inWords(Math.floor(n / 10000000)) + ' Crore' + (n % 10000000 !== 0 ? ' ' + inWords(n % 10000000) : '');
+  }
+
+  const integerPart = Math.floor(Math.abs(num));
+  return inWords(integerPart);
+}
 
 export function exportStockToExcel(
   products: Product[],
@@ -277,3 +298,280 @@ export function exportStockToPDF(
   const fileName = `Stock_Report_${company.companyName.replace(/[^a-zA-Z0-9]/g, '_')}_${todayStr}.pdf`;
   doc.save(fileName);
 }
+
+export function generateSaleInvoicePDF(
+  sale: SaleTransaction,
+  company: CompanyConfig
+): jsPDF {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4', // 210mm x 297mm
+  });
+
+  // Top Dark Header Banner
+  doc.setFillColor(15, 23, 42); // slate-900
+  doc.rect(0, 0, 210, 32, 'F');
+
+  // Accent highlight line
+  doc.setFillColor(37, 99, 235); // blue-600
+  doc.rect(0, 31, 210, 1.5, 'F');
+
+  // Left Company Brand Details
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text(company.companyName.toUpperCase(), 14, 11);
+
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(191, 219, 254); // blue-200
+  doc.text(company.tagline, 14, 17);
+
+  doc.setTextColor(203, 213, 225); // slate-300
+  doc.setFontSize(7.5);
+  doc.text(`${company.address} • ${company.branchLocation}`, 14, 22);
+  doc.text(`Phone: ${company.phone} | VAT/BIN: ${company.vatNumber}`, 14, 27);
+
+  // Right Header Invoice Info
+  doc.setFillColor(30, 58, 138); // blue-900
+  doc.roundedRect(138, 5, 58, 8, 1.5, 1.5, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.text('OFFICIAL TAX INVOICE', 167, 10.5, { align: 'center' });
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(10.5);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`#${sale.invoiceNumber}`, 196, 20, { align: 'right' });
+
+  doc.setTextColor(203, 213, 225);
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Date: ${sale.date}`, 196, 26, { align: 'right' });
+
+  // Customer Details & Order Details Cards (A4 standard)
+  const metaY = 37;
+
+  // Card 1: Billed To Customer
+  doc.setFillColor(248, 250, 252); // slate-50
+  doc.setDrawColor(226, 232, 240); // slate-200
+  doc.roundedRect(14, metaY, 88, 26, 2, 2, 'FD');
+
+  doc.setTextColor(100, 116, 139); // slate-500
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'bold');
+  doc.text('BILLED TO / CUSTOMER DETAILS:', 18, metaY + 6);
+
+  doc.setTextColor(15, 23, 42); // slate-900
+  doc.setFontSize(9.5);
+  doc.setFont('helvetica', 'bold');
+  doc.text(sale.customerName || 'Cash / Walk-in Customer', 18, metaY + 12);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(71, 85, 105); // slate-600
+  doc.text(`Contact: ${sale.customerPhone || 'Not provided'}`, 18, metaY + 17);
+  doc.text(`Delivery Location: Counter Pickup (${company.branchLocation})`, 18, metaY + 22);
+
+  // Card 2: Order Metadata & Status
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(108, metaY, 88, 26, 2, 2, 'FD');
+
+  doc.setTextColor(100, 116, 139);
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'bold');
+  doc.text('PAYMENT & ORDER METADATA:', 112, metaY + 6);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(71, 85, 105);
+  doc.text(`Payment Method: ${sale.paymentMethod}`, 112, metaY + 12);
+  doc.text(`Sales Officer / Handled By: ${sale.soldBy}`, 112, metaY + 17);
+  doc.text(`Payment Status: `, 112, metaY + 22);
+  doc.setTextColor(21, 128, 61); // green-700
+  doc.setFont('helvetica', 'bold');
+  doc.text('FULL PAYMENT RECEIVED', 140, metaY + 22);
+
+  // Line Items Table with Serial Numbers & Warranty
+  const tableRows = sale.items.map((item, index) => {
+    const serialList = item.serials && item.serials.length > 0
+      ? `\nAssigned S/N: ${item.serials.join(', ')}\nWarranty: 1 Year Official Distributor Hardware Warranty`
+      : '\nWarranty: Standard Store Policy';
+
+    const itemDesc = `${item.productName}\nSKU: ${item.sku}${serialList}`;
+    const subtotal = item.quantity * item.unitPrice;
+
+    return [
+      (index + 1).toString(),
+      itemDesc,
+      item.quantity.toString(),
+      `${company.currency} ${item.unitPrice.toLocaleString()}`,
+      `${company.currency} ${subtotal.toLocaleString()}`,
+    ];
+  });
+
+  autoTable(doc, {
+    startY: 68,
+    head: [
+      ['#', 'Item Description & Serial Numbers (Keep for Warranty)', 'Qty', 'Unit Price', 'Amount'],
+    ],
+    body: tableRows,
+    styles: {
+      fontSize: 8,
+      cellPadding: 3,
+      textColor: [30, 41, 59],
+      lineColor: [226, 232, 240],
+      lineWidth: 0.1,
+    },
+    headStyles: {
+      fillColor: [30, 58, 138], // Navy
+      textColor: [255, 255, 255],
+      fontStyle: 'bold',
+      fontSize: 8.5,
+    },
+    columnStyles: {
+      0: { cellWidth: 10, halign: 'center', fontStyle: 'bold' },
+      1: { cellWidth: 97 },
+      2: { cellWidth: 15, halign: 'center', fontStyle: 'bold' },
+      3: { cellWidth: 30, halign: 'right' },
+      4: { cellWidth: 30, halign: 'right', fontStyle: 'bold' },
+    },
+  });
+
+  let currentY = (doc as any).lastAutoTable.finalY + 6;
+
+  // Amount in Words
+  doc.setFillColor(241, 245, 249);
+  doc.rect(14, currentY, 182, 7, 'F');
+  doc.setTextColor(30, 41, 59);
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'bold');
+  const currencyName = company.currency === '৳' ? 'Taka' : company.currency;
+  const words = `Amount in Words: ${numberToWords(sale.totalAmount)} ${currencyName} Only.`;
+  doc.text(words, 18, currentY + 4.8);
+
+  currentY += 12;
+
+  // Terms & Conditions (Left) and Financial Totals (Right)
+  // Left: Terms
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(14, currentY, 105, 36, 1.5, 1.5, 'FD');
+
+  doc.setTextColor(15, 23, 42);
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Warranty Terms & Commercial Policy:', 18, currentY + 5.5);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.8);
+  doc.setTextColor(71, 85, 105);
+  doc.text('1. Warranty claims strictly require this physical or digital A4 invoice.', 18, currentY + 11);
+  doc.text('2. Serial numbers must match product barcode label without damage/tampering.', 18, currentY + 16);
+  doc.text('3. Physical breakage, burn marks, or liquid damage void warranty completely.', 18, currentY + 21);
+  doc.text('4. Replacement or service takes 7-21 business days as per distributor RMA.', 18, currentY + 26);
+  doc.text('5. Sold goods are non-refundable after successful hardware testing.', 18, currentY + 31);
+
+  // Right: Totals
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(203, 213, 225);
+  doc.roundedRect(124, currentY, 72, 36, 1.5, 1.5, 'FD');
+
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text('Sub Total:', 128, currentY + 7);
+  doc.setTextColor(15, 23, 42);
+  doc.text(`${company.currency} ${sale.totalAmount.toLocaleString()}`, 192, currentY + 7, { align: 'right' });
+
+  doc.setTextColor(100, 116, 139);
+  doc.text('VAT / Tax (Included):', 128, currentY + 13);
+  doc.setTextColor(15, 23, 42);
+  doc.text(`${company.currency} 0.00`, 192, currentY + 13, { align: 'right' });
+
+  // Grand Total Highlight Banner
+  doc.setFillColor(30, 58, 138); // Navy
+  doc.rect(124, currentY + 17, 72, 9, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'bold');
+  doc.text('TOTAL PAYABLE:', 128, currentY + 23);
+  doc.text(`${company.currency} ${sale.totalAmount.toLocaleString()}`, 192, currentY + 23, { align: 'right' });
+
+  // Paid & Balance
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(21, 128, 61); // green-700
+  doc.text('Total Paid:', 128, currentY + 31);
+  doc.text(`${company.currency} ${sale.totalAmount.toLocaleString()}`, 192, currentY + 31, { align: 'right' });
+
+  // Signature lines
+  const sigY = 252;
+  doc.setDrawColor(148, 163, 184); // slate-400
+  doc.setLineDashPattern([1, 1], 0);
+
+  // Customer Signature
+  doc.line(20, sigY, 70, sigY);
+  doc.setLineDashPattern([], 0); // reset
+  doc.setTextColor(71, 85, 105);
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Customer Acceptance Signature', 45, sigY + 5, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  doc.text('(Received goods in satisfactory condition)', 45, sigY + 9, { align: 'center' });
+
+  // Authorized Signature
+  doc.setLineDashPattern([1, 1], 0);
+  doc.line(140, sigY, 190, sigY);
+  doc.setLineDashPattern([], 0);
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(15, 23, 42);
+  doc.text(`Authorized Signatory`, 165, sigY + 5, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  doc.setTextColor(71, 85, 105);
+  doc.text(`For ${company.companyName}`, 165, sigY + 9, { align: 'center' });
+
+  // Official Seal Badge Stamp
+  doc.setDrawColor(37, 99, 235);
+  doc.roundedRect(147, sigY - 14, 36, 11, 1, 1, 'D');
+  doc.setTextColor(37, 99, 235);
+  doc.setFontSize(6);
+  doc.setFont('helvetica', 'bold');
+  doc.text('OFFICIAL VERIFIED', 165, sigY - 9, { align: 'center' });
+  doc.text(company.branchLocation.toUpperCase(), 165, sigY - 5.5, { align: 'center' });
+
+  // Bottom Footer
+  doc.setDrawColor(226, 232, 240);
+  doc.line(14, 276, 196, 276);
+
+  doc.setFontSize(7);
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Thank you for trusting ${company.companyName}! • Technical Support: ${company.phone}`, 14, 282);
+  doc.text(`System Generated A4 Commercial Tax Invoice | Page 1 of 1`, 196, 282, { align: 'right' });
+
+  return doc;
+}
+
+export function downloadInvoicePDF(
+  sale: SaleTransaction,
+  company: CompanyConfig
+): void {
+  const doc = generateSaleInvoicePDF(sale, company);
+  doc.save(`Invoice_${sale.invoiceNumber}.pdf`);
+}
+
+export function getInvoicePDFBlobUrl(
+  sale: SaleTransaction,
+  company: CompanyConfig
+): string {
+  const doc = generateSaleInvoicePDF(sale, company);
+  const blob = doc.output('blob');
+  return URL.createObjectURL(blob);
+}
+

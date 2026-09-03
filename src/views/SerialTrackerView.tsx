@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { SerialItem, Product, CompanyConfig, User } from '../types/inventory';
+import { SerialItem, Product, CompanyConfig, User, SaleTransaction } from '../types/inventory';
 import {
   QrCode,
   Search,
@@ -14,7 +14,8 @@ import {
   Copy,
   Check,
   Tag,
-  ArrowRight
+  ArrowRight,
+  FileText
 } from 'lucide-react';
 
 interface SerialTrackerViewProps {
@@ -22,7 +23,9 @@ interface SerialTrackerViewProps {
   products: Product[];
   company: CompanyConfig;
   currentUser: User | null;
+  sales?: SaleTransaction[];
   onUpdateSerialStatus: (serialId: string, newStatus: SerialItem['status']) => void;
+  onViewInvoice?: (sale: SaleTransaction, mode?: 'paper' | 'pdf') => void;
 }
 
 export const SerialTrackerView: React.FC<SerialTrackerViewProps> = ({
@@ -30,7 +33,9 @@ export const SerialTrackerView: React.FC<SerialTrackerViewProps> = ({
   products,
   company,
   currentUser,
+  sales = [],
   onUpdateSerialStatus,
+  onViewInvoice,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'sold' | 'defective'>('all');
@@ -343,7 +348,47 @@ export const SerialTrackerView: React.FC<SerialTrackerViewProps> = ({
                     </div>
                     <div>
                       <span className="text-slate-500 block">Sale Invoice:</span>
-                      <span className="font-mono text-blue-900 font-bold">#{activeSerial.saleInvoice}</span>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="font-mono text-blue-900 font-bold">#{activeSerial.saleInvoice}</span>
+                        {onViewInvoice && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const match = sales.find(s => s.invoiceNumber === activeSerial.saleInvoice);
+                              if (match) {
+                                onViewInvoice(match, 'pdf');
+                              } else {
+                                // Create synthetic sale for viewing
+                                const fallbackSale: SaleTransaction = {
+                                  id: `sale-serial-${activeSerial.id}`,
+                                  invoiceNumber: activeSerial.saleInvoice || 'SINV-RECORD',
+                                  customerName: activeSerial.customerName || 'Retail Customer',
+                                  customerPhone: activeSerial.customerPhone,
+                                  date: activeSerial.saleDate || '2026-02-20',
+                                  paymentMethod: 'Cash',
+                                  totalAmount: activeSerial.salePrice || 0,
+                                  soldBy: 'Distribution Staff',
+                                  createdAt: new Date().toISOString(),
+                                  items: [{
+                                    productId: activeSerial.productId,
+                                    productName: activeSerial.productName,
+                                    sku: activeSerial.sku,
+                                    quantity: 1,
+                                    unitPrice: activeSerial.salePrice || 0,
+                                    serials: [activeSerial.serialNumber],
+                                  }]
+                                };
+                                onViewInvoice(fallbackSale, 'pdf');
+                              }
+                            }}
+                            className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 hover:bg-rose-200 transition cursor-pointer flex items-center gap-0.5"
+                            title="View official A4 PDF invoice"
+                          >
+                            <FileText className="w-2.5 h-2.5" />
+                            <span>PDF</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <div>
                       <span className="text-slate-500 block">Sale Date:</span>

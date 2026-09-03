@@ -23,6 +23,7 @@ interface DashboardViewProps {
   company: CompanyConfig;
   currentUser: User | null;
   onNavigate: (tab: NavTab) => void;
+  onViewInvoice?: (sale: SaleTransaction, mode?: 'paper' | 'pdf') => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -33,6 +34,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   company,
   currentUser,
   onNavigate,
+  onViewInvoice,
 }) => {
   // Metric calculations
   const totalStockUnits = products.reduce((acc, p) => acc + p.currentStock, 0);
@@ -289,17 +291,33 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
             
             <div className="space-y-2.5">
-              {sales.slice(0, 3).map((s) => (
-                <div key={s.id} className="p-2 rounded bg-slate-50 border border-slate-100 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-slate-800">{s.invoiceNumber}</span>
-                    <span className="text-[10px] font-mono text-emerald-700 font-bold">
-                      +{company.currency} {s.totalAmount.toLocaleString()}
-                    </span>
+              {sales.slice(0, 4).map((s) => (
+                <div 
+                  key={s.id} 
+                  className="p-2 rounded-lg bg-slate-50 border border-slate-100 text-xs hover:bg-slate-100/70 transition flex items-center justify-between gap-2"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-semibold text-slate-900 font-mono">#{s.invoiceNumber}</span>
+                      <span className="text-[10px] font-mono text-emerald-700 font-bold">
+                        +{company.currency} {s.totalAmount.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-500 mt-0.5 truncate">
+                      Customer: {s.customerName} ({s.items.reduce((a, b) => a + b.quantity, 0)} items)
+                    </div>
                   </div>
-                  <div className="text-[11px] text-slate-500 mt-0.5 truncate">
-                    Customer: {s.customerName} ({s.items.reduce((a, b) => a + b.quantity, 0)} items)
-                  </div>
+
+                  {onViewInvoice && (
+                    <button
+                      type="button"
+                      onClick={() => onViewInvoice(s, 'pdf')}
+                      className="px-2 py-1 rounded bg-rose-50 text-rose-700 hover:bg-rose-100 font-bold text-[10px] border border-rose-200 transition cursor-pointer shrink-0"
+                      title="View A4 PDF Invoice"
+                    >
+                      PDF
+                    </button>
+                  )}
                 </div>
               ))}
 

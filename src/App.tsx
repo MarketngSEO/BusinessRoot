@@ -12,6 +12,7 @@ import { SerialTrackerView } from './views/SerialTrackerView';
 import { UserManagementView } from './views/UserManagementView';
 import { SettingsView } from './views/SettingsView';
 import { QuickFindModal } from './components/QuickFindModal';
+import { A4InvoiceModal } from './components/A4InvoiceModal';
 
 export default function App() {
   const [database, setDatabase] = useState<AppDatabase>(() => storageService.loadDatabase());
@@ -19,6 +20,13 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
   const [isQuickFindOpen, setIsQuickFindOpen] = useState(false);
   const [stockInProductId, setStockInProductId] = useState<string | undefined>(undefined);
+  const [viewingInvoice, setViewingInvoice] = useState<SaleTransaction | null>(null);
+  const [viewingInvoiceMode, setViewingInvoiceMode] = useState<'paper' | 'pdf'>('paper');
+
+  const handleOpenInvoiceModal = (sale: SaleTransaction, mode: 'paper' | 'pdf' = 'paper') => {
+    setViewingInvoice(sale);
+    setViewingInvoiceMode(mode);
+  };
 
   // Auto-login if remembered login exists
   useEffect(() => {
@@ -213,6 +221,7 @@ export default function App() {
                 setStockInProductId(undefined);
                 setActiveTab(tab);
               }}
+              onViewInvoice={handleOpenInvoiceModal}
             />
           )}
 
@@ -245,6 +254,7 @@ export default function App() {
               serials={database.serials}
               company={database.company}
               currentUser={currentUser}
+              sales={database.sales}
               onRecordSale={handleRecordSale}
               onNavigateToStock={() => setActiveTab('stock')}
             />
@@ -256,7 +266,9 @@ export default function App() {
               products={database.products}
               company={database.company}
               currentUser={currentUser}
+              sales={database.sales}
               onUpdateSerialStatus={handleUpdateSerialStatus}
+              onViewInvoice={handleOpenInvoiceModal}
             />
           )}
 
@@ -289,6 +301,15 @@ export default function App() {
         serials={database.serials}
         company={database.company}
         onNavigate={(tab) => setActiveTab(tab)}
+      />
+
+      {/* Global A4 Invoice & PDF Viewer Modal */}
+      <A4InvoiceModal
+        isOpen={Boolean(viewingInvoice)}
+        sale={viewingInvoice}
+        company={database.company}
+        onClose={() => setViewingInvoice(null)}
+        defaultViewMode={viewingInvoiceMode}
       />
     </div>
   );
